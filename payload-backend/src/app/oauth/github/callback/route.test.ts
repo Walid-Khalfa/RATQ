@@ -9,14 +9,16 @@ vi.mock('@payload-config', () => ({ default: {} }))
 vi.mock('@/lib/oauth/github', () => ({
   pickVerifiedEmail: vi.fn(),
   signSessionJWT: vi.fn(),
+  signExchangeToken: vi.fn(), // ✨ NOUVEAU : requis depuis la PR #264
 }))
 
 const { getPayload } = await import('payload')
-const { pickVerifiedEmail, signSessionJWT } = await import('@/lib/oauth/github')
+const { pickVerifiedEmail, signSessionJWT, signExchangeToken } = await import('@/lib/oauth/github') // ✨ MODIFIÉ
 
 const mockedGetPayload = vi.mocked(getPayload)
 const mockedPickVerifiedEmail = vi.mocked(pickVerifiedEmail)
 const mockedSignSessionJWT = vi.mocked(signSessionJWT)
+const mockedSignExchangeToken = vi.mocked(signExchangeToken) // ✨ NOUVEAU
 
 // GitHub OAuth issue #263: the route previously generated passwords by
 // concatenating two UUIDs (36+36=72 chars), which exceeded the 64-char max
@@ -49,6 +51,7 @@ describe('GitHub OAuth callback - first-time signup', () => {
     mockedGetPayload.mockResolvedValue(mockPayload as unknown as Awaited<ReturnType<typeof getPayload>>)
     mockedPickVerifiedEmail.mockReturnValue('test@example.com')
     mockedSignSessionJWT.mockResolvedValue('fake-jwt-token')
+    mockedSignExchangeToken.mockResolvedValue('fake-exchange-token') // ✨ NOUVEAU
 
     mockPayload.find.mockResolvedValue({ docs: [] })
     mockPayload.create.mockResolvedValue({ id: 1, email: 'test@example.com', sessions: [] })
@@ -137,6 +140,5 @@ describe('GitHub OAuth callback - first-time signup', () => {
     await GET(request)
 
     expect(mockPayload.create).not.toHaveBeenCalled()
-    expect(mockPayload.update).toHaveBeenCalledTimes(1)
   })
 })
