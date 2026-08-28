@@ -62,14 +62,33 @@ function removeMockEdgeCache() {
   delete (globalThis as any).caches;
 }
 
+// Module-level reference captured before any test patches it.
+const _OriginalRequest = globalThis.Request;
+
 beforeEach(() => {
   vi.resetModules();
   mockGet.mockReset();
   mockNotFound.mockClear();
+  // Patch globalThis.Request to strip cross-realm AbortSignal from init.
+  // In jsdom environment, globalThis.AbortSignal is jsdom's class while
+  // globalThis.Request is Node's undici Request. Passing a jsdom signal
+  // into Node's Request constructor throws a cross-realm TypeError.
+  // Wrapping Request here lets the page's synthetic cache-key Request
+  // objects be constructed without the signal, which is fine because
+  // withEdgeCache only uses request.url for cache-key matching.
+  const _OrigRequest = globalThis.Request;
+  (globalThis as any).Request = class Request extends _OrigRequest {
+    constructor(info: RequestInfo | URL, init?: RequestInit) {
+      const { signal: _signal, ...rest } = init || {};
+      super(info, rest as RequestInit);
+    }
+  } as any;
+  Object.setPrototypeOf((globalThis as any).Request, _OrigRequest);
 });
 
 afterEach(() => {
   removeMockEdgeCache();
+  (globalThis as any).Request = _OriginalRequest;
 });
 
 describe('ResourceDetailPage', () => {
